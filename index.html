@@ -517,6 +517,38 @@
 
   render(die1, 1);
   render(die2, 1);
+
+  // ===== Auto-actualización =====
+  // Cada 45s revisa si se publicó una versión nueva de la app y, solo si
+  // cambió, recarga la página. No recarga si estás tirando o con el cartel
+  // de cárcel abierto, para no interrumpir la partida.
+  let baseHash = null;
+
+  function quickHash(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0;
+    return h;
+  }
+
+  async function checkForUpdate() {
+    // No interrumpir mientras se juega
+    if (btn.disabled || jail.classList.contains('show')) return;
+    try {
+      const res = await fetch('index.html?_=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) return;
+      const text = await res.text();
+      const h = quickHash(text);
+      if (baseHash === null) { baseHash = h; return; }   // primera vez: guarda referencia
+      if (h !== baseHash) {
+        // Hay versión nueva publicada -> recargar
+        setBoth(labels, 'Actualizando app...', false);
+        setTimeout(() => location.reload(true), 700);
+      }
+    } catch (e) { /* sin conexión: reintenta en el próximo ciclo */ }
+  }
+
+  checkForUpdate();                 // establece la referencia al abrir
+  setInterval(checkForUpdate, 45000);
 </script>
 </body>
 </html>
