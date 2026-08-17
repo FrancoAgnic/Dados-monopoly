@@ -19,7 +19,12 @@ Una vez desplegada, la app queda en:
 
 Abrí `index.html` con doble clic en cualquier navegador.
 
-## Deploy
+## Deploy (GitHub Pages)
 
-El deploy es automático con **GitHub Pages** mediante GitHub Actions
-(`.github/workflows/deploy.yml`). Cada push a `main` vuelve a publicar la app.
+Se publica con **GitHub Pages** directamente desde la rama `main`:
+
+1. Andá a **Settings → Pages** del repo.
+2. En **Source**, elegí **Deploy from a branch**.
+3. Branch: **main** / carpeta **/ (root)** → **Save**.
+
+En 1-2 minutos queda online en la URL de arriba. Cada push a `main` la actualiza.
