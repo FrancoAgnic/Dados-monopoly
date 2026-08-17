@@ -14,6 +14,8 @@ Una vez desplegada, la app queda en:
 - **Sonido** de traqueteo al tirar y un sonido al mostrar el resultado.
 - **Resultado en número grande** (la suma) bien visible.
 - **Sonido especial** cuando salen **dobles** (los dos dados iguales) 🎉.
+- Resultado visible **de los dos lados de la mesa** (uno girado 180°) y botón **TIRAR** grande y centrado.
+- **3 dobles seguidos → ¡a la cárcel!** 🚔: aparece un cartel rojo con luces de policía y sirena.
 - Botón para **silenciar** el sonido 🔇/🔊.
 - Funciona en celular y computadora, sin instalar nada.
 

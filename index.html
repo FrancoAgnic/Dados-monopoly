@@ -156,8 +156,82 @@
     font-size: 1.5rem;
     cursor: pointer;
     opacity: .85;
+    z-index: 20;
   }
   .mute:hover { opacity: 1; }
+
+  /* ===== Cartel de CÁRCEL con luces de policía ===== */
+  .jail {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2rem 1rem;
+    text-align: center;
+    animation: policeFlash .5s steps(1) infinite;
+  }
+  .jail.show { display: flex; }
+  /* fondo que alterna rojo/azul como sirena */
+  @keyframes policeFlash {
+    0%   { background: #c0071a; box-shadow: inset 0 0 220px 60px rgba(255,0,0,.7); }
+    50%  { background: #0a2ec0; box-shadow: inset 0 0 220px 60px rgba(0,40,255,.7); }
+    100% { background: #c0071a; box-shadow: inset 0 0 220px 60px rgba(255,0,0,.7); }
+  }
+  /* barras de luces arriba y abajo */
+  .lights {
+    width: 100%;
+    height: 14px;
+    border-radius: 999px;
+    animation: lightBar .3s steps(1) infinite;
+  }
+  @keyframes lightBar {
+    0%   { background: linear-gradient(90deg, #ff2b2b 0 33%, #fff 33% 66%, #2b5bff 66% 100%); }
+    50%  { background: linear-gradient(90deg, #2b5bff 0 33%, #fff 33% 66%, #ff2b2b 66% 100%); }
+    100% { background: linear-gradient(90deg, #ff2b2b 0 33%, #fff 33% 66%, #2b5bff 66% 100%); }
+  }
+  .jail-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .4rem;
+  }
+  .jail-msg.flip { transform: rotate(180deg); }
+  .jail-emoji { font-size: clamp(3rem, 14vw, 6rem); line-height: 1; }
+  .jail-title {
+    font-size: clamp(2rem, 10vw, 4rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow: 0 0 12px rgba(0,0,0,.6), 0 4px 0 #7a0010;
+    animation: jailPulse .5s ease-in-out infinite alternate;
+  }
+  .jail-sub {
+    font-size: clamp(1rem, 4.5vw, 1.6rem);
+    font-weight: 700;
+    color: #ffe;
+  }
+  @keyframes jailPulse {
+    from { transform: scale(1); }
+    to   { transform: scale(1.08); }
+  }
+  .jail-close {
+    font: inherit;
+    font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+    font-weight: 800;
+    color: #c0071a;
+    background: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: .7rem 2rem;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0,0,0,.4);
+    z-index: 31;
+  }
+  .jail-close:active { transform: scale(.96); }
 </style>
 </head>
 <body>
@@ -184,6 +258,29 @@
     <span class="label" id="labelBottom">Tirá los dados</span>
     <span class="bignum" id="bignumBottom"></span>
     <span class="breakdown" id="breakdownBottom"></span>
+  </div>
+
+  <!-- Cartel de CÁRCEL (3 dobles seguidos) -->
+  <div class="jail" id="jail">
+    <div class="lights"></div>
+
+    <!-- mensaje para el jugador de enfrente (girado) -->
+    <div class="jail-msg flip">
+      <span class="jail-emoji">🚨🚔👮</span>
+      <span class="jail-title">¡Va a la cárcel!</span>
+      <span class="jail-sub">3 dobles seguidos</span>
+    </div>
+
+    <button class="jail-close" id="jailClose">Entendido, a la cárcel 🚔</button>
+
+    <!-- mensaje para tu lado (normal) -->
+    <div class="jail-msg">
+      <span class="jail-emoji">🚨🚔👮</span>
+      <span class="jail-title">¡Va a la cárcel!</span>
+      <span class="jail-sub">3 dobles seguidos</span>
+    </div>
+
+    <div class="lights"></div>
   </div>
 
 <script>
@@ -282,6 +379,27 @@
     tone(1567.98, 0.5, 0.5, 'sawtooth', 0.7);
   }
 
+  // Sirena de policía (fuerte) para el cartel de cárcel
+  function playSiren(dur = 3.0) {
+    if (muted) return;
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sawtooth';
+    g.gain.value = 0.9;
+    osc.connect(g).connect(master);
+    const t0 = ctx.currentTime;
+    let t = t0;
+    osc.frequency.setValueAtTime(700, t);
+    const step = 0.35;
+    for (let i = 0; t < t0 + dur; i++) {
+      osc.frequency.linearRampToValueAtTime(i % 2 === 0 ? 1300 : 700, t + step);
+      t += step;
+    }
+    osc.start(t0);
+    osc.stop(t + 0.05);
+  }
+
   // ===== Dados =====
   function render(dieEl, value) {
     dieEl.innerHTML = '';
@@ -293,6 +411,17 @@
   }
 
   function randomDie() { return Math.floor(Math.random() * 6) + 1; }
+
+  // Contador de dobles seguidos y cartel de cárcel
+  let doblesSeguidos = 0;
+  const jail = document.getElementById('jail');
+  const jailClose = document.getElementById('jailClose');
+
+  function showJail() {
+    jail.classList.add('show');
+    playSiren(3.0);
+  }
+  jailClose.addEventListener('click', () => jail.classList.remove('show'));
 
   function setBoth(arr, htmlOrText, isHtml) {
     arr.forEach(el => { if (isHtml) el.innerHTML = htmlOrText; else el.textContent = htmlOrText; });
@@ -335,13 +464,27 @@
       const suma = v1 + v2;
       const esDoble = v1 === v2;
 
+      // Cuenta de dobles seguidos
+      if (esDoble) doblesSeguidos++; else doblesSeguidos = 0;
+
       setBoth(labels, esDoble ? '¡DOBLES!' : 'Resultado', false);
       showBig(suma);
-      setBoth(breakdowns,
-        `${v1} + ${v2}` + (esDoble ? `<br><span class="double-badge">🎉 Doble ${v1} · ¡tirá de nuevo!</span>` : ''),
-        true);
 
-      if (esDoble) playDouble(); else playResult();
+      let extra = '';
+      if (esDoble) {
+        extra = `<br><span class="double-badge">🎉 Doble ${v1} · ${doblesSeguidos}º seguido</span>`;
+      }
+      setBoth(breakdowns, `${v1} + ${v2}` + extra, true);
+
+      if (doblesSeguidos >= 3) {
+        // Tercer doble seguido: ¡a la cárcel!
+        showJail();
+        doblesSeguidos = 0;
+      } else if (esDoble) {
+        playDouble();
+      } else {
+        playResult();
+      }
       btn.disabled = false;
     }, 800);
   }
