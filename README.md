@@ -11,8 +11,10 @@ Una vez desplegada, la app queda en:
 ## Qué hace
 
 - Tira **dos dados** con animación de sacudida.
-- Muestra el valor de cada dado y la **suma total**.
-- Avisa cuando salen **dobles** (los dos dados iguales) 🎉.
+- **Sonido** de traqueteo al tirar y un sonido al mostrar el resultado.
+- **Resultado en número grande** (la suma) bien visible.
+- **Sonido especial** cuando salen **dobles** (los dos dados iguales) 🎉.
+- Botón para **silenciar** el sonido 🔇/🔊.
 - Funciona en celular y computadora, sin instalar nada.
 
 ## Uso local

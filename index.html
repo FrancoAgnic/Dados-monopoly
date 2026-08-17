@@ -11,6 +11,7 @@
     --accent: #ffd447;
     --die: #fdfdfd;
     --pip: #2a2140;
+    --double: #58e08a;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -23,10 +24,11 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2rem;
+    gap: 1.6rem;
     padding: 2rem 1rem;
     text-align: center;
     user-select: none;
+    overflow-x: hidden;
   }
   h1 {
     font-size: clamp(1.8rem, 6vw, 3rem);
@@ -72,12 +74,49 @@
   .p4 { grid-area: 2 / 1; } .p5 { grid-area: 2 / 2; } .p6 { grid-area: 2 / 3; }
   .p7 { grid-area: 3 / 1; } .p8 { grid-area: 3 / 2; } .p9 { grid-area: 3 / 3; }
 
-  .total {
-    font-size: clamp(1.1rem, 4vw, 1.5rem);
-    min-height: 1.5em;
-    opacity: .95;
+  /* Resultado en número grande */
+  .result {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .2rem;
+    min-height: 1.3em;
   }
-  .total b { color: var(--accent); font-size: 1.3em; }
+  .result .label {
+    font-size: clamp(.9rem, 3.5vw, 1.15rem);
+    opacity: .85;
+    letter-spacing: .5px;
+  }
+  .bignum {
+    font-size: clamp(4.5rem, 22vw, 9rem);
+    font-weight: 900;
+    line-height: 1;
+    color: var(--accent);
+    text-shadow: 0 6px 24px rgba(0,0,0,.45);
+  }
+  .bignum.pop { animation: pop .45s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop {
+    0% { transform: scale(.3); opacity: 0; }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .breakdown {
+    font-size: clamp(1rem, 4vw, 1.35rem);
+    opacity: .9;
+    min-height: 1.4em;
+  }
+  .double-badge {
+    display: inline-block;
+    margin-top: .3rem;
+    padding: .25rem .9rem;
+    border-radius: 999px;
+    background: var(--double);
+    color: #08331c;
+    font-weight: 800;
+    font-size: clamp(.95rem, 3.8vw, 1.2rem);
+    box-shadow: 0 6px 18px rgba(88,224,138,.45);
+    animation: pop .45s cubic-bezier(.2,1.4,.4,1);
+  }
 
   button {
     font: inherit;
@@ -95,6 +134,17 @@
   button:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(255,212,71,.5); }
   button:active { transform: translateY(1px) scale(.97); }
   button:disabled { opacity: .6; cursor: default; transform: none; }
+
+  .mute {
+    background: transparent;
+    color: #fff;
+    box-shadow: none;
+    font-size: 1.5rem;
+    padding: .3rem .6rem;
+    opacity: .8;
+  }
+  .mute:hover { transform: none; box-shadow: none; opacity: 1; }
+  .controls { display: flex; align-items: center; gap: .8rem; }
 </style>
 </head>
 <body>
@@ -105,12 +155,19 @@
     <div class="die" id="die2"></div>
   </div>
 
-  <div class="total" id="total">Presiona el botón para tirar</div>
+  <div class="result" id="result">
+    <span class="label" id="resultLabel">Presiona el botón para tirar</span>
+    <span class="bignum" id="bignum"></span>
+    <span class="breakdown" id="breakdown"></span>
+  </div>
 
-  <button id="rollBtn">¡Tirar!</button>
+  <div class="controls">
+    <button id="rollBtn">¡Tirar!</button>
+    <button id="muteBtn" class="mute" title="Silenciar / activar sonido" aria-label="Silenciar">🔊</button>
+  </div>
 
 <script>
-  // Mapa de qué puntos se encienden para cada valor (posiciones en grilla 3x3)
+  // ===== Puntos de cada cara (grilla 3x3) =====
   const FACES = {
     1: [5],
     2: [1, 9],
@@ -122,9 +179,82 @@
 
   const die1 = document.getElementById('die1');
   const die2 = document.getElementById('die2');
-  const totalEl = document.getElementById('total');
+  const resultLabel = document.getElementById('resultLabel');
+  const bignum = document.getElementById('bignum');
+  const breakdown = document.getElementById('breakdown');
   const btn = document.getElementById('rollBtn');
+  const muteBtn = document.getElementById('muteBtn');
 
+  // ===== Audio (Web Audio API, sin archivos externos) =====
+  let audioCtx = null;
+  let muted = false;
+
+  function getCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  // Un tono simple con envolvente
+  function tone(freq, start, dur, type = 'sine', gain = 0.25) {
+    const ctx = getCtx();
+    const t0 = ctx.currentTime + start;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+
+  // Traqueteo de dados: ráfagas cortas de ruido
+  function playShake(duration = 0.8) {
+    if (muted) return;
+    const ctx = getCtx();
+    const clicks = 14;
+    for (let i = 0; i < clicks; i++) {
+      const t0 = ctx.currentTime + Math.random() * duration;
+      const len = 0.03;
+      const buffer = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let j = 0; j < data.length; j++) {
+        data[j] = (Math.random() * 2 - 1) * (1 - j / data.length); // ruido que decae
+      }
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const g = ctx.createGain();
+      g.gain.value = 0.18 + Math.random() * 0.12;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 1800 + Math.random() * 2200;
+      src.connect(filter).connect(g).connect(ctx.destination);
+      src.start(t0);
+    }
+  }
+
+  // Sonido al mostrar el resultado normal
+  function playResult() {
+    if (muted) return;
+    tone(523.25, 0, 0.18, 'triangle', 0.25); // Do
+    tone(783.99, 0.09, 0.22, 'triangle', 0.22); // Sol
+  }
+
+  // Sonido especial de dobles: fanfarria ascendente alegre
+  function playDouble() {
+    if (muted) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // Do - Mi - Sol - Do agudo
+    notes.forEach((f, i) => tone(f, i * 0.12, 0.3, 'square', 0.18));
+    // brillo final
+    tone(1318.5, 0.5, 0.4, 'triangle', 0.16);
+  }
+
+  // ===== Lógica de dados =====
   function render(dieEl, value) {
     dieEl.innerHTML = '';
     for (const pos of FACES[value]) {
@@ -138,13 +268,24 @@
     return Math.floor(Math.random() * 6) + 1; // 1..6
   }
 
+  function showBig(n) {
+    bignum.textContent = n;
+    bignum.classList.remove('pop');
+    void bignum.offsetWidth; // reinicia la animación
+    bignum.classList.add('pop');
+  }
+
   function roll() {
+    getCtx(); // "desbloquea" el audio con el gesto del usuario
     btn.disabled = true;
-    totalEl.textContent = 'Tirando...';
+    resultLabel.textContent = 'Tirando...';
+    bignum.textContent = '';
+    breakdown.innerHTML = '';
     die1.classList.add('rolling');
     die2.classList.add('rolling');
 
-    // Cambia de cara rápido para dar sensación de tirada
+    playShake(0.8);
+
     const spin = setInterval(() => {
       render(die1, randomDie());
       render(die2, randomDie());
@@ -159,14 +300,28 @@
       die1.classList.remove('rolling');
       die2.classList.remove('rolling');
 
-      let msg = `${v1} + ${v2} = <b>${v1 + v2}</b>`;
-      if (v1 === v2) msg += ' &nbsp;¡Dobles! 🎉';
-      totalEl.innerHTML = msg;
+      const suma = v1 + v2;
+      const esDoble = v1 === v2;
+
+      resultLabel.textContent = esDoble ? '¡DOBLES!' : 'Resultado';
+      showBig(suma);
+      breakdown.innerHTML = `${v1} + ${v2}` +
+        (esDoble ? `<br><span class="double-badge">🎉 Doble ${v1} · ¡tirá de nuevo!</span>` : '');
+
+      if (esDoble) playDouble();
+      else playResult();
+
       btn.disabled = false;
     }, 800);
   }
 
   btn.addEventListener('click', roll);
+
+  muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    muteBtn.setAttribute('aria-label', muted ? 'Activar sonido' : 'Silenciar');
+  });
 
   // Estado inicial
   render(die1, 1);
