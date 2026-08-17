@@ -432,6 +432,9 @@
 
   // Contador de dobles seguidos y cartel de cárcel
   let doblesSeguidos = 0;
+  // MODO PRUEBA: las primeras 3 tiradas salen dobles a propósito
+  // para poder probar el cartel de cárcel. Después, todo al azar normal.
+  let tiradasForzadas = 3;
   const jail = document.getElementById('jail');
   const jailClose = document.getElementById('jailClose');
 
@@ -473,8 +476,14 @@
 
     setTimeout(() => {
       clearInterval(spin);
-      const v1 = randomDie();
-      const v2 = randomDie();
+      let v1, v2;
+      if (tiradasForzadas > 0) {
+        v1 = v2 = randomDie(); // fuerza doble para probar la cárcel
+        tiradasForzadas--;
+      } else {
+        v1 = randomDie();
+        v2 = randomDie();
+      }
       render(die1, v1);
       render(die2, v2);
       die1.classList.remove('rolling');
