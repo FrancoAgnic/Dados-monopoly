@@ -432,9 +432,10 @@
 
   // Contador de dobles seguidos y cartel de cárcel
   let doblesSeguidos = 0;
-  // MODO PRUEBA: las primeras 3 tiradas salen dobles a propósito
-  // para poder probar el cartel de cárcel. Después, todo al azar normal.
-  let tiradasForzadas = 3;
+  // MODO PRUEBA: las primeras 3 tiradas salen dobles a propósito para probar
+  // el cartel de cárcel. Pasa UNA SOLA VEZ por navegador (se recuerda con
+  // localStorage), así no se repite en cada recarga. Después, todo al azar.
+  let tiradasForzadas = localStorage.getItem('pruebaCarcelHecha') ? 0 : 3;
   const jail = document.getElementById('jail');
   const jailClose = document.getElementById('jailClose');
 
@@ -480,6 +481,7 @@
       if (tiradasForzadas > 0) {
         v1 = v2 = randomDie(); // fuerza doble para probar la cárcel
         tiradasForzadas--;
+        if (tiradasForzadas === 0) localStorage.setItem('pruebaCarcelHecha', '1');
       } else {
         v1 = randomDie();
         v2 = randomDie();
