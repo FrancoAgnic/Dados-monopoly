@@ -47,6 +47,15 @@
     opacity: .85;
     letter-spacing: .5px;
   }
+  .numword {
+    font-size: clamp(1.6rem, 8vw, 3rem);
+    font-weight: 900;
+    line-height: 1;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
   .bignum {
     font-size: clamp(3.5rem, 16vw, 7rem);
     font-weight: 900;
@@ -240,6 +249,7 @@
   <!-- Resultado para el jugador de ENFRENTE (girado 180°) -->
   <div class="result flip" id="resultTop">
     <span class="label" id="labelTop">Tirá los dados</span>
+    <span class="numword" id="numwordTop"></span>
     <span class="bignum" id="bignumTop"></span>
     <span class="breakdown" id="breakdownTop"></span>
   </div>
@@ -256,6 +266,7 @@
   <!-- Resultado para TU lado (normal) -->
   <div class="result" id="resultBottom">
     <span class="label" id="labelBottom">Tirá los dados</span>
+    <span class="numword" id="numwordBottom"></span>
     <span class="bignum" id="bignumBottom"></span>
     <span class="breakdown" id="breakdownBottom"></span>
   </div>
@@ -300,8 +311,15 @@
 
   // Los dos bloques de resultado (arriba girado, abajo normal)
   const labels = [document.getElementById('labelTop'), document.getElementById('labelBottom')];
+  const numwords = [document.getElementById('numwordTop'), document.getElementById('numwordBottom')];
   const bignums = [document.getElementById('bignumTop'), document.getElementById('bignumBottom')];
   const breakdowns = [document.getElementById('breakdownTop'), document.getElementById('breakdownBottom')];
+
+  // Palabra de cada resultado posible (suma de 2 a 12)
+  const WORDS = {
+    2: 'DOS', 3: 'TRES', 4: 'CUATRO', 5: 'CINCO', 6: 'SEIS', 7: 'SIETE',
+    8: 'OCHO', 9: 'NUEVE', 10: 'DIEZ', 11: 'ONCE', 12: 'DOCE'
+  };
 
   // ===== Audio (Web Audio API, sin archivos externos) =====
   let audioCtx = null, master = null, compressor = null, muted = false;
@@ -440,6 +458,7 @@
     getCtx();
     btn.disabled = true;
     setBoth(labels, 'Tirando...', false);
+    setBoth(numwords, '', false);
     setBoth(bignums, '', false);
     setBoth(breakdowns, '', true);
     die1.classList.add('rolling');
@@ -468,6 +487,7 @@
       if (esDoble) doblesSeguidos++; else doblesSeguidos = 0;
 
       setBoth(labels, esDoble ? '¡DOBLES!' : 'Resultado', false);
+      setBoth(numwords, WORDS[suma], false);
       showBig(suma);
 
       let extra = '';
