@@ -187,18 +187,30 @@
 
   // ===== Audio (Web Audio API, sin archivos externos) =====
   let audioCtx = null;
+  let master = null;      // volumen maestro
+  let compressor = null;  // evita distorsión al subir fuerte
   let muted = false;
 
   function getCtx() {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      // Cadena: sonidos -> master (volumen alto) -> compresor -> parlantes
+      master = audioCtx.createGain();
+      master.gain.value = 3.0; // BIEN fuerte
+      compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.value = -18;
+      compressor.knee.value = 20;
+      compressor.ratio.value = 12;
+      compressor.attack.value = 0.002;
+      compressor.release.value = 0.2;
+      master.connect(compressor).connect(audioCtx.destination);
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
   }
 
-  // Un tono simple con envolvente
-  function tone(freq, start, dur, type = 'sine', gain = 0.25) {
+  // Un tono simple con envolvente (sale por el master fuerte)
+  function tone(freq, start, dur, type = 'sine', gain = 0.9) {
     const ctx = getCtx();
     const t0 = ctx.currentTime + start;
     const osc = ctx.createOscillator();
@@ -208,19 +220,19 @@
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(master);
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
   }
 
-  // Traqueteo de dados: ráfagas cortas de ruido
+  // Traqueteo de dados: ráfagas cortas de ruido (fuertes)
   function playShake(duration = 0.8) {
     if (muted) return;
     const ctx = getCtx();
-    const clicks = 14;
+    const clicks = 20;
     for (let i = 0; i < clicks; i++) {
       const t0 = ctx.currentTime + Math.random() * duration;
-      const len = 0.03;
+      const len = 0.035;
       const buffer = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate);
       const data = buffer.getChannelData(0);
       for (let j = 0; j < data.length; j++) {
@@ -229,29 +241,34 @@
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       const g = ctx.createGain();
-      g.gain.value = 0.18 + Math.random() * 0.12;
+      g.gain.value = 0.8 + Math.random() * 0.5; // mucho más fuerte
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
       filter.frequency.value = 1800 + Math.random() * 2200;
-      src.connect(filter).connect(g).connect(ctx.destination);
+      src.connect(filter).connect(g).connect(master);
       src.start(t0);
     }
   }
 
-  // Sonido al mostrar el resultado normal
+  // Sonido al mostrar el resultado normal (fuerte y con cuerpo)
   function playResult() {
     if (muted) return;
-    tone(523.25, 0, 0.18, 'triangle', 0.25); // Do
-    tone(783.99, 0.09, 0.22, 'triangle', 0.22); // Sol
+    tone(523.25, 0, 0.22, 'sawtooth', 0.85); // Do
+    tone(783.99, 0.10, 0.28, 'sawtooth', 0.8); // Sol
+    tone(261.63, 0, 0.3, 'square', 0.5); // bajo que le da golpe
   }
 
-  // Sonido especial de dobles: fanfarria ascendente alegre
+  // Sonido especial de dobles: fanfarria ascendente bien fuerte
   function playDouble() {
     if (muted) return;
     const notes = [523.25, 659.25, 783.99, 1046.5]; // Do - Mi - Sol - Do agudo
-    notes.forEach((f, i) => tone(f, i * 0.12, 0.3, 'square', 0.18));
+    notes.forEach((f, i) => {
+      tone(f, i * 0.12, 0.35, 'sawtooth', 0.9);
+      tone(f / 2, i * 0.12, 0.35, 'square', 0.45); // refuerzo grave
+    });
     // brillo final
-    tone(1318.5, 0.5, 0.4, 'triangle', 0.16);
+    tone(1318.5, 0.5, 0.5, 'square', 0.8);
+    tone(1567.98, 0.5, 0.5, 'sawtooth', 0.7);
   }
 
   // ===== Lógica de dados =====
